@@ -1,0 +1,21 @@
+{
+  "name": "Mausam Pro - Personalized Weather",
+  "short_name": "Mausam",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#090d16",
+  "theme_color": "#090d16",
+  "description": "Hyper-Personalized Weather Intelligence Mobile Application",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/1163/1163624.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/1163/1163624.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

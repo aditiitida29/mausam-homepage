@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#090d16">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Mausam Pro">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1163/1163624.png">
+  
+  <title>Mausam Pro - Hyper-Personalized Weather Intelligence</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- Leaflet Map CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-slate-950 text-slate-100 antialiased selection:bg-sky-500 selection:text-white">
+
+  <!-- Dynamic Atmospheric Background & Overlays -->
+  <div id="weather-bg" class="weather-bg bg-sunny-day"></div>
+  <div id="lightning-flash"></div>
+  <canvas id="weather-canvas"></canvas>
+
+  <!-- Top Global Floating Control Bar -->
+  <div class="fixed top-3 left-1/2 transform -translate-x-1/2 z-50 flex items-center gap-1.5 sm:gap-2 glass-panel px-3 py-1.5 sm:py-2 border border-white/20 shadow-2xl max-w-[95vw]">
+    <button id="btn-toggle-view" title="Toggle Phone / Expanded Frame" class="hidden sm:flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg bg-sky-500/20 hover:bg-sky-500/40 text-sky-300 transition-all border border-sky-400/30">
+      <i data-lucide="smartphone" class="w-3.5 h-3.5"></i>
+      <span id="view-mode-label">Phone Frame</span>
+    </button>
+    <button id="btn-sync-gps" title="Sync with Real Current GPS / IP Location" class="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-300 transition-all border border-emerald-400/40 location-live-glow">
+      <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+      <i data-lucide="crosshair" class="w-3.5 h-3.5"></i>
+      <span id="gps-sync-label" class="hidden sm:inline">Sync Location</span>
+    </button>
+    <button id="btn-open-mobile-share" title="Open on Real Smartphone (QR Code / Network URL)" class="flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg bg-blue-500/20 hover:bg-blue-500/40 text-blue-300 transition-all border border-blue-400/30">
+      <i data-lucide="qr-code" class="w-3.5 h-3.5"></i>
+      <span class="hidden md:inline">Open on Phone</span>
+    </button>
+    <button id="btn-open-radar" class="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/30 text-emerald-300 transition-all">
+      <i data-lucide="radar" class="w-3.5 h-3.5"></i>
+      <span class="hidden md:inline">Radar</span>
+    </button>
+    <button id="btn-open-voice" class="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg bg-purple-500/20 hover:bg-purple-500/40 text-purple-300 transition-all border border-purple-400/30">
+      <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-300"></i>
+      <span class="hidden md:inline">Voice</span>
+    </button>
+    <button id="btn-open-customizer" title="Customize Homepage" class="flex items-center text-xs font-semibold p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-all">
+      <i data-lucide="sliders" class="w-3.5 h-3.5"></i>
+    </button>
+    <button id="btn-toggle-notifs" title="Alerts & Notifications" class="relative flex items-center text-xs font-semibold p-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 transition-all">
+      <i data-lucide="bell" class="w-3.5 h-3.5"></i>
+      <span id="notif-badge" class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full animate-ping"></span>
+      <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full"></span>
+    </button>
+  </div>
+
+  <!-- Main Phone Wrapper / Container -->
+  <div id="app-wrapper" class="phone-mode-wrapper pt-14 sm:pt-16">
+    <div class="phone-chassis" id="phone-frame-element">
+      
+      <!-- Phone Notch / Dynamic Island (Only on desktop simulator) -->
+      <div class="phone-notch">
+        <div class="w-2.5 h-2.5 rounded-full bg-slate-900 border border-slate-700"></div>
+        <div class="flex items-center gap-1">
+          <span id="notch-time" class="text-[10px] font-bold text-slate-300">12:28</span>
+          <div class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
+        </div>
+      </div>
+
+      <!-- Phone Screen Scrollable Area -->
+      <div class="phone-screen px-3 sm:px-4 pt-4 sm:pt-10 pb-12" id="phone-content">
+        
+        <!-- App Top Header & Location Bar -->
+        <header class="mb-3">
+          <div class="flex items-center justify-between gap-2 mb-2">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-sky-400 via-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/30 flex-shrink-0">
+                <i data-lucide="cloud-sun" class="w-5 h-5 text-white"></i>
+              </div>
+              <div>
+                <h1 class="text-base font-extrabold tracking-tight text-white flex items-center gap-1.5">
+                  Mausam <span class="text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded bg-sky-500/30 text-sky-300 border border-sky-400/30">Pro</span>
+                </h1>
+                <p class="text-[11px] text-slate-400 font-medium">Personalized Atmospheric Intelligence</p>
+              </div>
+            </div>
+            
+            <div class="flex items-center gap-1.5">
+              <button id="btn-temp-unit" class="text-[11px] font-bold px-2 py-1 rounded-lg glass-panel hover:bg-white/20 text-sky-300 transition-all border border-white/10">
+                °C
+              </button>
+              <button id="btn-refresh" title="Refresh Live Data" class="p-1.5 rounded-lg glass-panel hover:bg-white/20 text-slate-300 transition-all">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Real-Time Location Synced Banner -->
+          <div id="location-sync-banner" class="mb-2 p-2 rounded-xl bg-emerald-950/40 border border-emerald-500/30 flex items-center justify-between text-xs">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0"></span>
+              <div class="truncate">
+                <span class="text-[10px] text-emerald-300/80 font-bold uppercase tracking-wider block">Live Location Synced</span>
+                <span id="synced-locality-text" class="text-xs font-bold text-white truncate block">New Delhi, India</span>
+              </div>
+            </div>
+            <button id="btn-quick-resync" class="px-2 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-[10px] font-bold text-emerald-300 border border-emerald-400/30 flex-shrink-0 ml-2">
+              Re-Sync
+            </button>
+          </div>
+
+          <!-- Location Selector & Search Input -->
+          <div class="relative">
+            <div class="flex items-center gap-1.5 glass-panel px-3 py-2 border border-white/15">
+              <i data-lucide="map-pin" class="w-4 h-4 text-rose-400 flex-shrink-0"></i>
+              <select id="city-select" class="bg-transparent text-xs font-semibold text-white focus:outline-none flex-1 cursor-pointer truncate">
+                <!-- Dynamically populated -->
+              </select>
+              <button id="btn-geo" title="Sync with Current GPS" class="text-emerald-400 hover:text-emerald-300 p-1 flex items-center gap-1 text-[11px] font-bold flex-shrink-0">
+                <i data-lucide="crosshair" class="w-3.5 h-3.5"></i>
+                <span class="text-[10px]">GPS</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Quick City Chips -->
+          <div class="flex items-center gap-1.5 overflow-x-auto py-2 scrollbar-none text-[11px]">
+            <span class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider pl-1">City:</span>
+            <button class="city-quick-chip px-2.5 py-0.5 rounded-full glass-card hover:bg-sky-500/20 text-slate-300 hover:text-white transition-all text-[11px]" data-city="delhi">Delhi</button>
+            <button class="city-quick-chip px-2.5 py-0.5 rounded-full glass-card hover:bg-sky-500/20 text-slate-300 hover:text-white transition-all text-[11px]" data-city="mumbai">Mumbai</button>
+            <button class="city-quick-chip px-2.5 py-0.5 rounded-full glass-card hover:bg-sky-500/20 text-slate-300 hover:text-white transition-all text-[11px]" data-city="goa">Goa</button>
+            <button class="city-quick-chip px-2.5 py-0.5 rounded-full glass-card hover:bg-sky-500/20 text-slate-300 hover:text-white transition-all text-[11px]" data-city="shimla">Shimla</button>
+            <button class="city-quick-chip px-2.5 py-0.5 rounded-full glass-card hover:bg-sky-500/20 text-slate-300 hover:text-white transition-all text-[11px]" data-city="london">London</button>
+            <button class="city-quick-chip px-2.5 py-0.5 rounded-full glass-card hover:bg-sky-500/20 text-slate-300 hover:text-white transition-all text-[11px]" data-city="tokyo">Tokyo</button>
+          </div>
+
+          <!-- Atmospheric Theme Quick Switcher -->
+          <div class="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-[10px]">
+            <span class="text-[9px] text-amber-400/90 font-bold uppercase tracking-wider pl-1 flex items-center gap-0.5 flex-shrink-0">
+              <i data-lucide="palette" class="w-3 h-3"></i> Theme:
+            </span>
+            <button class="theme-preview-chip px-2 py-0.5 rounded-full bg-amber-500/10 hover:bg-amber-500/30 text-amber-300 border border-amber-400/20 flex-shrink-0" data-theme="sunny">☀️ Sunny</button>
+            <button class="theme-preview-chip px-2 py-0.5 rounded-full bg-rose-500/10 hover:bg-rose-500/30 text-rose-300 border border-rose-400/20 flex-shrink-0" data-theme="sunset">🌅 Sunset</button>
+            <button class="theme-preview-chip px-2 py-0.5 rounded-full bg-indigo-500/10 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-400/20 flex-shrink-0" data-theme="night">✨ Starry Night</button>
+            <button class="theme-preview-chip px-2 py-0.5 rounded-full bg-sky-500/10 hover:bg-sky-500/30 text-sky-300 border border-sky-400/20 flex-shrink-0" data-theme="rainy">🌧️ Rain</button>
+            <button class="theme-preview-chip px-2 py-0.5 rounded-full bg-purple-500/10 hover:bg-purple-500/30 text-purple-300 border border-purple-400/20 flex-shrink-0" data-theme="stormy">⚡ Thunder</button>
+            <button class="theme-preview-chip px-2 py-0.5 rounded-full bg-slate-500/10 hover:bg-slate-500/30 text-slate-300 border border-slate-400/20 flex-shrink-0" data-theme="foggy">🌫️ Mist</button>
+            <button class="theme-preview-chip px-2 py-0.5 rounded-full bg-emerald-500/10 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-400/20 flex-shrink-0" data-theme="auto">🔄 Auto Solar</button>
+          </div>
+        </header>
+
+        <!-- Persona Selector Carousel -->
+        <section class="mb-4">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1">
+              <i data-lucide="user-check" class="w-3.5 h-3.5 text-sky-400"></i> Active Persona
+            </span>
+            <span id="persona-summary-badge" class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-400/30">
+              Personalized
+            </span>
+          </div>
+
+          <div id="persona-carousel" class="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+            <!-- Persona Chips dynamically generated -->
+          </div>
+        </section>
+
+        <!-- Weather Main Hero Card -->
+        <section id="weather-hero" class="glass-panel p-4 mb-4 relative overflow-hidden border border-white/20">
+          <div class="flex items-start justify-between">
+            <div>
+              <div class="flex items-center gap-1.5">
+                <h2 id="hero-city" class="text-xl font-bold text-white tracking-tight">New Delhi</h2>
+                <span id="hero-country" class="text-xs text-slate-400 font-medium">IN</span>
+              </div>
+              <p id="hero-condition" class="text-xs font-semibold text-sky-300 mt-0.5">Partly Cloudy</p>
+              <p id="hero-timestamp" class="text-[10px] text-slate-400">Atmospheric sync active</p>
+            </div>
+            <div id="hero-icon-container" class="animate-float">
+              <i id="hero-weather-icon" data-lucide="cloud-sun" class="w-14 h-14 text-amber-400 animate-sun-pulse"></i>
+            </div>
+          </div>
+
+          <div class="mt-3 flex items-baseline gap-3">
+            <span id="hero-temp" class="text-5xl font-extrabold tracking-tight text-white">28°</span>
+            <div class="text-xs space-y-0.5">
+              <div class="text-slate-300">Feels like <span id="hero-feels" class="font-bold text-white">31°</span></div>
+              <div class="text-slate-400 text-[11px]">H: <span id="hero-high">34°</span> · L: <span id="hero-low">22°</span></div>
+            </div>
+          </div>
+
+          <!-- Dynamic Persona Highlight Banner in Hero -->
+          <div id="hero-persona-highlight" class="mt-4 p-2.5 rounded-xl bg-white/10 backdrop-blur-md border border-white/15 flex items-center justify-between">
+            <!-- Dynamic prompt according to persona -->
+          </div>
+        </section>
+
+        <!-- Quick Atmospheric Metric Grid -->
+        <section class="grid grid-cols-4 gap-2 mb-4">
+          <div class="glass-card p-2 text-center">
+            <span class="text-[10px] text-slate-400 block mb-0.5">Humidity</span>
+            <i data-lucide="droplets" class="w-3.5 h-3.5 text-blue-400 mx-auto mb-1"></i>
+            <span id="metric-humidity" class="text-xs font-bold text-white">62%</span>
+          </div>
+          <div class="glass-card p-2 text-center">
+            <span class="text-[10px] text-slate-400 block mb-0.5">Wind</span>
+            <i data-lucide="wind" class="w-3.5 h-3.5 text-teal-400 mx-auto mb-1"></i>
+            <span id="metric-wind" class="text-xs font-bold text-white">14 km/h</span>
+          </div>
+          <div class="glass-card p-2 text-center">
+            <span class="text-[10px] text-slate-400 block mb-0.5">UV Index</span>
+            <i data-lucide="sun" class="w-3.5 h-3.5 text-amber-400 mx-auto mb-1"></i>
+            <span id="metric-uv" class="text-xs font-bold text-white">6.2 (Mod)</span>
+          </div>
+          <div class="glass-card p-2 text-center">
+            <span class="text-[10px] text-slate-400 block mb-0.5">AQI</span>
+            <i data-lucide="activity" class="w-3.5 h-3.5 text-rose-400 mx-auto mb-1"></i>
+            <span id="metric-aqi" class="text-xs font-bold text-white">142</span>
+          </div>
+        </section>
+
+        <!-- 24-Hour Forecast Timeline with Chart -->
+        <section class="glass-panel p-3.5 mb-4">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+              <i data-lucide="clock" class="w-3.5 h-3.5 text-sky-400"></i> Hourly Forecast & Rain
+            </h3>
+            <span class="text-[10px] text-slate-400 font-medium">Next 24 Hours</span>
+          </div>
+          <div class="h-28 w-full mb-2">
+            <canvas id="hourlyChart"></canvas>
+          </div>
+          <div id="hourly-cards-container" class="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+            <!-- Hourly mini cards -->
+          </div>
+        </section>
+
+        <!-- Dynamic Personalized Persona Modules Section -->
+        <section id="persona-widgets-container" class="space-y-3">
+          <!-- Dynamically Injected Persona Widgets with In-Depth Detailing -->
+        </section>
+
+        <!-- 7-Day Extended Outlook Section -->
+        <section class="glass-panel p-3.5 mt-4">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+              <i data-lucide="calendar" class="w-3.5 h-3.5 text-indigo-400"></i> 7-Day Personalized Outlook
+            </h3>
+            <span class="text-[10px] text-slate-400 font-medium">Accurate Trends</span>
+          </div>
+          <div id="weekly-forecast-container" class="space-y-2">
+            <!-- Daily rows -->
+          </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="mt-6 text-center text-[10px] text-slate-500">
+          <p>Mausam Pro Mobile • Powered by Open-Meteo Weather API</p>
+          <p class="mt-0.5">Real-time Atmospheric & Behavioral Modeling</p>
+        </footer>
+
+      </div>
+
+      <!-- Phone Home Indicator Bar -->
+      <div class="phone-home-indicator"></div>
+
+    </div>
+  </div>
+
+  <!-- Open on Mobile Smartphone Modal (QR Code & Direct Local Network Access) -->
+  <div id="modal-mobile-share" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden items-center justify-center p-4">
+    <div class="glass-panel w-full max-w-sm p-5 border border-blue-500/30 flex flex-col items-center text-center relative">
+      <button id="btn-close-mobile-share" class="absolute top-3 right-3 p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+
+      <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-sky-500 flex items-center justify-center shadow-lg shadow-blue-500/40 mb-3">
+        <i data-lucide="smartphone" class="w-6 h-6 text-white"></i>
+      </div>
+
+      <h3 class="text-base font-bold text-white mb-1">Open on Your Smartphone</h3>
+      <p class="text-xs text-slate-300 mb-3">Scan this QR code with any camera or open the URL in your phone's browser:</p>
+
+      <div class="p-3 bg-white rounded-2xl shadow-xl mb-3 flex items-center justify-center">
+        <img id="mobile-qr-image" src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=http://192.168.31.186:8080" alt="Mausam Phone QR" class="w-44 h-44 rounded-lg">
+      </div>
+
+      <div class="w-full p-2.5 rounded-xl bg-slate-900/80 border border-white/15 flex items-center justify-between mb-3 text-xs">
+        <span id="mobile-network-url" class="font-mono text-sky-300 font-bold truncate">http://192.168.31.186:8080</span>
+        <button id="btn-copy-mobile-url" class="px-2 py-1 rounded bg-sky-500/20 hover:bg-sky-500/40 text-[10px] font-bold text-sky-300 border border-sky-400/30 flex-shrink-0 ml-2">
+          Copy URL
+        </button>
+      </div>
+
+      <p class="text-[11px] text-slate-400">💡 <strong>Tip:</strong> Both devices should be on the same Wi-Fi network. Tap "Add to Home Screen" on your phone to install it as an app!</p>
+    </div>
+  </div>
+
+  <!-- Radar Map Modal -->
+  <div id="modal-radar" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden items-center justify-center p-4">
+    <div class="glass-panel w-full max-w-2xl h-[85vh] flex flex-col border border-white/20 overflow-hidden">
+      <div class="p-3 border-b border-white/10 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i data-lucide="radar" class="w-5 h-5 text-emerald-400"></i>
+          <div>
+            <h3 class="text-sm font-bold text-white">Live Weather Radar & Atmospheric Map</h3>
+            <p class="text-[10px] text-slate-400">Precipitation, Cloud Density, and Wind Streams</p>
+          </div>
+        </div>
+        <button id="btn-close-radar" class="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-2 bg-slate-900/60 border-b border-white/10 flex items-center gap-2 overflow-x-auto text-xs">
+        <span class="text-[10px] text-slate-400 uppercase font-semibold">Radar Layer:</span>
+        <button class="radar-layer-btn active px-2.5 py-1 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-400/30" data-layer="precip">Precipitation / Rain</button>
+        <button class="radar-layer-btn px-2.5 py-1 rounded-md bg-white/5 text-slate-300 hover:bg-white/10" data-layer="clouds">Cloud Cover</button>
+        <button class="radar-layer-btn px-2.5 py-1 rounded-md bg-white/5 text-slate-300 hover:bg-white/10" data-layer="temp">Temperature Heatmap</button>
+        <button class="radar-layer-btn px-2.5 py-1 rounded-md bg-white/5 text-slate-300 hover:bg-white/10" data-layer="wind">Wind Streamlines</button>
+      </div>
+
+      <div id="radar-map" class="flex-1 w-full bg-slate-950"></div>
+
+      <div class="p-2.5 bg-slate-900/80 border-t border-white/10 text-xs flex items-center justify-between text-slate-300">
+        <div class="flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="text-[11px]">Real-time Doppler scan updating every 10 min</span>
+        </div>
+        <span id="radar-status-location" class="text-[11px] font-semibold text-sky-300">Delhi Region</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mausam Voice AI Modal -->
+  <div id="modal-voice" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden items-center justify-center p-4">
+    <div class="glass-panel w-full max-w-md p-5 border border-purple-500/30 flex flex-col items-center text-center relative">
+      <button id="btn-close-voice" class="absolute top-3 right-3 p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+
+      <div class="w-16 h-16 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-purple-500/40 mb-3 animate-pulse">
+        <i data-lucide="bot" class="w-8 h-8 text-white"></i>
+      </div>
+
+      <h3 class="text-base font-bold text-white mb-1">Mausam AI Voice Assistant</h3>
+      <p id="voice-persona-title" class="text-xs text-purple-300 font-medium mb-3">Health & Wellness Intelligence Briefing</p>
+
+      <div class="w-full bg-slate-900/70 p-3.5 rounded-xl border border-white/10 text-left text-xs text-slate-200 leading-relaxed mb-4 max-h-48 overflow-y-auto" id="voice-briefing-text">
+        <!-- AI Briefing dynamically populated -->
+      </div>
+
+      <div class="flex items-center gap-2 w-full">
+        <button id="btn-speak-briefing" class="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 font-semibold text-xs text-white flex items-center justify-center gap-2 shadow-lg shadow-purple-600/30 transition-all">
+          <i data-lucide="volume-2" class="w-4 h-4"></i>
+          <span>Play Voice Briefing</span>
+        </button>
+        <button id="btn-generate-ai-insight" class="py-2.5 px-3 rounded-xl bg-white/10 hover:bg-white/20 font-semibold text-xs text-slate-200 flex items-center gap-1.5 transition-all">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-300"></i>
+          <span>Regenerate</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Drawer / Simulator -->
+  <div id="modal-notifs" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden items-end sm:items-center justify-center p-2 sm:p-4">
+    <div class="glass-panel w-full max-w-sm p-4 border border-amber-500/30 flex flex-col">
+      <div class="flex items-center justify-between pb-2 border-b border-white/10 mb-3">
+        <div class="flex items-center gap-1.5 text-amber-300 font-bold text-xs">
+          <i data-lucide="bell-ring" class="w-4 h-4"></i>
+          <span>Live Weather Alerts & Notifications</span>
+        </div>
+        <button id="btn-close-notifs" class="p-1 text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div id="notif-list" class="space-y-2 max-h-64 overflow-y-auto pr-1">
+        <!-- Dynamic Alert Cards -->
+      </div>
+
+      <button id="btn-trigger-test-alert" class="mt-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/30 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all">
+        <i data-lucide="send" class="w-3.5 h-3.5"></i>
+        <span>Simulate Sudden Weather Alert</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Persona & Widget Customizer Modal -->
+  <div id="modal-customizer" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden items-center justify-center p-4">
+    <div class="glass-panel w-full max-w-md p-4 border border-sky-500/30 flex flex-col max-h-[85vh]">
+      <div class="flex items-center justify-between pb-2 border-b border-white/10 mb-3">
+        <div class="flex items-center gap-1.5 text-sky-300 font-bold text-xs">
+          <i data-lucide="sliders" class="w-4 h-4"></i>
+          <span>Customize Homepage Widgets</span>
+        </div>
+        <button id="btn-close-customizer" class="p-1 text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <p class="text-xs text-slate-400 mb-3">Select which modules to feature on your customized Mausam home screen:</p>
+
+      <div id="customizer-widget-list" class="space-y-2 overflow-y-auto flex-1 pr-1">
+        <!-- Checkboxes for all widgets -->
+      </div>
+
+      <div class="mt-4 pt-3 border-t border-white/10 flex items-center justify-between gap-2">
+        <button id="btn-reset-customizer" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-semibold text-slate-300">
+          Reset to Persona Default
+        </button>
+        <button id="btn-save-customizer" class="px-4 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-xs font-bold text-slate-950">
+          Save Dashboard
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+  <script>
+    // Register PWA Service Worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW register note:', err));
+      });
+    }
+  </script>
+</body>
+</html>
